@@ -1,5 +1,4 @@
 # Bloxorz #
-=============
 
 ![alt text](http://jpg.hoodamath.com/large/bloxorz_300x225.jpg)
 
@@ -7,10 +6,10 @@ Bloxorz is a game where the goal is to drop a 1×2×1 block through a hole in th
 http://www.coolmath-games.com/0-bloxorz/index.html
 
 ## Definition of the game ##
-=============
 
 Board is represented as a matrix:
-`sample_matrix = [
+```
+[
     ['O', 'O', 'O', 'O', 'X', 'X', 'X', 'X', 'X', 'X'],
     ['O', 'O', 'O', 'O', 'X', 'X', 'X', 'O', 'O', 'O'],
     ['O', 'O', 'O', 'O', 'O', 'O', 'O', 'O', 'O', 'G'],
@@ -18,7 +17,7 @@ Board is represented as a matrix:
     ['O', 'O', 'O', 'O', 'X', 'X', 'X', 'X', 'X', 'X'],
     ['S', 'S', 'O', 'O', 'X', 'X', 'X', 'X', 'X', 'X']
 ]
-`
+```
 
 * O denotes safe tiles: the block can stand on these anytime
 * X denotes empty tiles: the block may never touch an empty tile, even if half of the block is on a safe tile
@@ -26,7 +25,6 @@ Board is represented as a matrix:
 * G denotes the goal tile: the block needs to be on it (vertically) in order to fall into the goal
 
 ### Solution ###
-=============
 I have used two different ways to solve this game:
 1. Uniform Cost Search
 2. A* Search
