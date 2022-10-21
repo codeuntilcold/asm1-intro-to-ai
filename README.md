@@ -25,6 +25,7 @@ Board is represented as a matrix:
 * G denotes the goal tile: the block needs to be on it (vertically) in order to fall into the goal
 
 ### Solution ###
-I have used two different ways to solve this game:
-1. Uniform Cost Search
-2. A* Search
+Genetic algorithm
+
+### Credit ###
+Ege Alpay's solutions for this problem are on his [Gitlab repo](https://gitlab.com/egealpay/bloxorz-solver).

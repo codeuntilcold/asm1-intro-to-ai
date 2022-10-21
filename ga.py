@@ -1,15 +1,17 @@
+import random
+
+random.seed(32)
+
+from random import randint, random
 from problem import Problem
 from node import Node
-from min_heap import PriorityQueue
-from utils import memoize
+import math
 import time
 import resource
+import numpy as np
 
 
-# Ege Alpay 19551
-
-
-# Get coordinates of the Goal
+# Get the coordinates of the Goal
 def get_goal_points(board):
     x_goal, y_goal, index_board_row, index_board_col = -1, -1, -1, -1
     for rowBoard in board:
@@ -26,7 +28,7 @@ def get_goal_points(board):
     return x_goal, y_goal
 
 
-# Check coordinates of the block
+# Get the coordinates of the Block
 def get_block_points(board):
     x_start, y_start, x_end, y_end, index_board_row, index_board_col = -1, -1, -1, -1, -1, -1
     for rowBoard in board:
@@ -51,22 +53,22 @@ def get_block_points(board):
     return x_start, y_start, x_end, y_end
 
 
-# Check block orientation
+# To understand the orientation of the node
 def get_block_orientation(node):
     if node.x1 == node.x2 and node.y1 == node.y2:
+        return "standing"
+    elif abs(node.x1 - node.x2) == 1:
         return "vertical"
-    elif node.x1 + 1 == node.x2 or node.x2 + 1 == node.x1:
-        return "horizontal_north_south"
     else:
-        return "horizontal_east_west"
+        return "horizontal"
 
 
-# Check successor on right
+# Check if we can move right
 def check_right(node, orientation):
     current_path_cost = node.path_cost
     distance_to_new_node = 0
 
-    if orientation == "horizontal_east_west":
+    if orientation == "horizontal":
         y_new_pos1 = node.y1 + 2
         y_new_pos2 = node.y2 + 1
         x_new_pos1 = node.x1
@@ -81,7 +83,7 @@ def check_right(node, orientation):
 
         return None
 
-    elif orientation == "horizontal_north_south":
+    elif orientation == "vertical":
         y_new_pos1 = node.y1 + 1
         y_new_pos2 = node.y2 + 1
         x_new_pos1 = node.x1
@@ -108,12 +110,12 @@ def check_right(node, orientation):
                             path_cost=current_path_cost + distance_to_new_node)
 
 
-# Check successor on left
+# Check if we can move left
 def check_left(node, orientation):
     current_path_cost = node.path_cost
     distance_to_new_node = 0
 
-    if orientation == "horizontal_east_west":
+    if orientation == "horizontal":
         y_new_pos1 = node.y1 - 1
         y_new_pos2 = node.y2 - 2
         x_new_pos1 = node.x1
@@ -128,7 +130,7 @@ def check_left(node, orientation):
 
         return None
 
-    elif orientation == "horizontal_north_south":
+    elif orientation == "vertical":
         y_new_pos1 = node.y1 - 1
         y_new_pos2 = node.y2 - 1
         x_new_pos1 = node.x1
@@ -155,12 +157,12 @@ def check_left(node, orientation):
                             path_cost=current_path_cost + distance_to_new_node)
 
 
-# Check successor below
+# Check if we can move down
 def check_down(node, orientation):
     current_path_cost = node.path_cost
     distance_to_new_node = 0
 
-    if orientation == "horizontal_east_west":
+    if orientation == "horizontal":
         y_new_pos1 = node.y1
         y_new_pos2 = node.y2
         x_new_pos1 = node.x1 + 1
@@ -175,7 +177,7 @@ def check_down(node, orientation):
 
         return None
 
-    elif orientation == "horizontal_north_south":
+    elif orientation == "vertical":
         y_new_pos1 = node.y1
         y_new_pos2 = node.y2
         x_new_pos1 = node.x1 + 2
@@ -202,12 +204,12 @@ def check_down(node, orientation):
                             path_cost=current_path_cost + distance_to_new_node)
 
 
-# Check successor on top
+# Check if we can move up
 def check_up(node, orientation):
     current_path_cost = node.path_cost
     distance_to_new_node = 0
 
-    if orientation == "horizontal_east_west":
+    if orientation == "horizontal":
         y_new_pos1 = node.y1
         y_new_pos2 = node.y2
         x_new_pos1 = node.x1 - 1
@@ -222,7 +224,7 @@ def check_up(node, orientation):
 
         return None
 
-    elif orientation == "horizontal_north_south":
+    elif orientation == "vertical":
         y_new_pos1 = node.y1
         y_new_pos2 = node.y2
         x_new_pos1 = node.x1 - 1
@@ -249,86 +251,105 @@ def check_up(node, orientation):
                             path_cost=current_path_cost + distance_to_new_node)
 
 
-# Finding Successors
-def find_successors(node):
-    orientation = get_block_orientation(node)
-    successor_nodes = []
+# This method represents h(n). Calculates the distance from current position to goal
+def find_distance_to_goal(node):
+    x_avg = (node.x1 + node.x2) / 2
+    y_avg = (node.y1 + node.y2) / 2
 
-    # For each orientation, there are 4 different actions: Up, Down, Left, Right
-    up_successor = check_up(node, orientation)
-    down_successor = check_down(node, orientation)
-    left_successor = check_left(node, orientation)
-    right_successor = check_right(node, orientation)
+    hypotenuse = math.sqrt(math.pow((x_goal - x_avg), 2) + math.pow((y_goal - y_avg), 2))
 
-    if up_successor is not None:
-        successor_nodes.append(up_successor)
-    if down_successor is not None:
-        successor_nodes.append(down_successor)
-    if left_successor is not None:
-        successor_nodes.append(left_successor)
-    if right_successor is not None:
-        successor_nodes.append(right_successor)
-
-    return successor_nodes
+    return hypotenuse
 
 
-def best_first_graph_search(problem, f, x_block_1, y_block_1, x_block_2, y_block_2):
-    """Search the nodes with the lowest f scores first.
-    You specify the function f(node) that you want to minimize; for example,
-    if f is a heuristic estimate to the goal, then we have greedy best
-    first search; if f is node.depth then we have breadth-first search.
-    There is a subtlety: the line "f = memoize(f, 'f')" means that the f
-    values will be cached on the nodes as they are computed. So after doing
-    a best first search you can examine the f values of the path returned."""
-    f = memoize(f, 'f')
-    # Our initial node / state
-    initial_node = Node(x_block_1, y_block_1, x_block_2, y_block_2)
-    # Priority queue will give our the node which has the lowest f value
-    frontier = PriorityQueue('min', f)
-    frontier.append(initial_node)
-    explored = set()
-    # While there is a node in frontier:
-    while frontier:
-        # Take node from frontier
-        node = frontier.pop()
-        # Check if this node is the goal node
-        if problem.goal_test(node):
-            # return the goal node and memory consumption
-            return node, resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-        # Add it to explored set
-        explored.add((node.x1, node.y1, node.x2, node.y2))
-        # Find the successors of the current node
-        successors = find_successors(node)
-        # For each successor of the current node
-        for successor in successors:
-            # If the successor has not visited and is not in frontier
-            if (successor.x1, successor.y1, successor.x2, successor.y2) not in explored and successor not in frontier:
-                # Add it to frontier
-                frontier.append(successor)
-            # If it is in frontier
-            elif successor in frontier:
-                # Compare f values and update if needed
-                incumbent = frontier[successor]
-                if f(successor) < f(incumbent):
-                    del frontier[incumbent]
-                    frontier.append(successor)
-    # Return None if we can't reach to goal node
-    return None, resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+### GENETIC ALGORITHM ###
+
+def crossover(p1, p2, r_cross):
+    if random() < r_cross:
+        parent1, parent2 = p1.copy(), p2.copy()
+        crossover_point = randint(1, len(p1)-2)
+        c1 = parent1[:crossover_point] + parent2[crossover_point:]
+        c2 = parent2[:crossover_point] + parent1[crossover_point:]
+        return [c1, c2]
+
+def mutation(path, r_mut):
+    if random() < r_mut:
+        new_path = path.copy()
+        new_path[randint(0, len(path) - 1)] = randint(0, 3) 
+        return new_path
+
+walker = [ check_left, check_down, check_up, check_right ]
+def walk(problem, node, path):
+    if problem.goal_test(node):
+        return True, 0
+    if len(path) == 0:
+        return False, node.distance_to_goal
+
+    node.distance_to_goal = find_distance_to_goal(node) + (1 - int(problem.goal_test(node)))
+    step = path[0]
+    orietation = get_block_orientation(node)
+    successor = walker[step](node, orietation)
+    if successor is None:
+        return False, node.distance_to_goal
+    return walk(problem, successor, path[1:])
+
+def genetic_algorithm_search(problem, x_block_1, y_block_1, x_block_2, y_block_2):
+    MAX_PATH = 2 * (number_of_rows + number_of_columns)
+    POPULATION_SIZE = 10
+    MAX_GENERATIONS = 10
+    P_CROSSOVER = 0.75
+    
+    paths = [[randint(0, 3) for _ in range(MAX_PATH)] for _ in range(POPULATION_SIZE)]
+
+    for i in range(MAX_GENERATIONS):
+        print(f"GENERATION {i+1}===")
+        # Calculate value of each node after stepping
+        results = []
+        for path in paths:
+            initial_node = Node(x_block_1, y_block_1, x_block_2, y_block_2)
+            success, distance = walk(problem, initial_node, path)
+            if success:
+                return path, resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+            else:
+                results.append(distance)
+
+        # Reproduce
+        for i in range(0, POPULATION_SIZE, 2):
+            p1, p2 = paths[i], paths[i+1]
+            childs = crossover(p1, p2, P_CROSSOVER)
+            if childs:
+                for path in childs:
+                    initial_node = Node(x_block_1, y_block_1, x_block_2, y_block_2)
+                    success, distance = walk(problem, initial_node, path)
+                    if success:
+                        return path, resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+                    else:
+                        paths.append(path)
+                        results.append(distance)
+
+        # Mutation
+        for path in paths:
+            child = mutation(path, i / float(MAX_GENERATIONS))
+            if child:
+                initial_node = Node(x_block_1, y_block_1, x_block_2, y_block_2)
+                success, distance = walk(problem, initial_node, child)
+                if success:
+                    return child, resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+                else:
+                    paths.append(child)
+                    results.append(distance)
+
+        best_idx = np.argpartition(np.array(results), POPULATION_SIZE)[:POPULATION_SIZE]
+        results = [results[i] for i in best_idx]
+        paths = [paths[i] for i in best_idx]
+        print(f"Best result is {min(results)}")
+
+        # print(f"Best results until now: {min([results[i] for i in best_idx])}")
+    
+    # Cannot find path
+    return [], resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
 
 
-def uniform_cost_search(problem, x_block_1, y_block_1, x_block_2, y_block_2):
-    """[Figure 3.14]"""
-    return best_first_graph_search(problem, lambda node: node.path_cost, x_block_1, y_block_1, x_block_2, y_block_2)
-
-
-'''
-sample_matrix = [
-    ['O', 'O', 'O', 'X', 'O', 'X', 'X', 'X'],
-    ['O', 'O', 'O', 'O', 'O', 'O', 'G', 'X'],
-    ['X', 'X', 'O', 'X', 'O', 'O', 'O', 'O'],
-    ['S', 'S', 'O', 'X', 'X', 'X', 'O', 'O']
-]
-'''
+        
 '''
 sample_matrix = [
     ["O", "O", "O", "X", "X", "X", "X", "X", "X", "X"],
@@ -339,6 +360,8 @@ sample_matrix = [
     ["X", "X", "X", "X", "X", "X", "O", "O", "O", "X"],
 ]
 '''
+
+
 '''
 sample_matrix = [
     ["S", "O", "O"],
@@ -346,6 +369,16 @@ sample_matrix = [
     ["O", "O", "G"],
     ["X", "O", "O"],
     ["X", "X", "X"],
+]
+'''
+
+
+'''
+sample_matrix = [
+    ['O', 'O', 'O', 'X', 'O', 'X', 'X', 'X'],
+    ['O', 'O', 'O', 'O', 'O', 'O', 'G', 'X'],
+    ['X', 'X', 'O', 'X', 'O', 'O', 'O', 'O'],
+    ['S', 'S', 'O', 'X', 'X', 'X', 'O', 'O']
 ]
 '''
 '''
@@ -356,6 +389,8 @@ sample_matrix = [
     ['S', 'S', 'O', 'X', 'X', 'X', 'O', 'O']
 ]
 '''
+
+
 sample_matrix = [
     ['O', 'O', 'O', 'O', 'X', 'X', 'X', 'X', 'X', 'X'],
     ['O', 'O', 'O', 'O', 'X', 'X', 'X', 'O', 'O', 'O'],
@@ -365,7 +400,7 @@ sample_matrix = [
     ['S', 'S', 'O', 'O', 'X', 'X', 'X', 'X', 'X', 'X']
 ]
 
-# Number of rows and columns of the matrix
+
 number_of_rows = len(sample_matrix)
 number_of_columns = len(sample_matrix[0])
 
@@ -375,30 +410,17 @@ x_goal, y_goal = get_goal_points(sample_matrix)
 # Coordinates of the block
 x_block_1, y_block_1, x_block_2, y_block_2 = get_block_points(sample_matrix)
 
-# Initialized our problem with the coordinates of the goal
 problem = Problem(x_goal, y_goal)
 
-# Measure time
 start_time = time.time()
-result_node, memory_info = uniform_cost_search(problem, x_block_1, y_block_1, x_block_2, y_block_2)
+result_node, memory_info = genetic_algorithm_search(problem, x_block_1, y_block_1, x_block_2, y_block_2)
 end_time = time.time()
 
 print("\n--- %s seconds ---" % (end_time - start_time))
 print(f"\n{memory_info} bytes\n")
 
-# If no solution exists
 if result_node is None:
     print("Solution does not exists")
 else:
-    # If solution exists
-    # It is -1 since "count_of_moves = number_of_nodes - 1"
-    count_of_moves = -1
-
-    print("\nStarting from coordinates of the goal to coordinates of the initial block: ")
-    while result_node is not None:
-        print(f"(({result_node.x1}, {result_node.y1}), ({result_node.x2}, {result_node.y2}))")
-        print("\n")
-        result_node = result_node.parent
-        count_of_moves += 1
-
-    print(f"Total moves needed: {count_of_moves}")
+    mapping = [ "LEFT", "DOWN", "UP", "RIGHT" ]
+    print(list(map(lambda step: mapping[step], result_node)))
