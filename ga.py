@@ -8,7 +8,7 @@ from node import Node
 import time
 import resource
 import numpy as np
-
+import json
 
 class GeneticAlgorithm:
     def crossover(p1, p2, r_cross):
@@ -27,14 +27,14 @@ class GeneticAlgorithm:
 
     def walk(problem, node, path):
         if problem.goal_test(node):
-            return True, 0
+            return True, node
         if len(path) == 0:
-            return False, node.distance_to_goal
+            return False, node
 
         node.distance_to_goal = problem.find_distance_to_goal(node) + (1 - int(problem.goal_test(node)))
         successor = problem.walk_along(path[0], node)
         if successor is None:
-            return False, node.distance_to_goal
+            return False, node
         return GeneticAlgorithm.walk(problem, successor, path[1:])
 
     def run(problem: Problem):
@@ -51,12 +51,12 @@ class GeneticAlgorithm:
             # Calculate value of each node after stepping
             results = []
             for path in paths:
-                initial_node = Node(x_block_1, y_block_1, x_block_2, y_block_2)
-                success, distance = GeneticAlgorithm.walk(problem, initial_node, path)
+                initial_node = Node(x_block_1, y_block_1, x_block_2, y_block_2, -1)
+                success, node = GeneticAlgorithm.walk(problem, initial_node, path)
                 if success:
-                    return path, resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+                    return node.solution(), resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
                 else:
-                    results.append(distance)
+                    results.append(node.distance_to_goal)
 
             # Reproduce
             for i in range(0, POPULATION_SIZE, 2):
@@ -64,25 +64,25 @@ class GeneticAlgorithm:
                 childs = GeneticAlgorithm.crossover(p1, p2, P_CROSSOVER)
                 if childs:
                     for path in childs:
-                        initial_node = Node(x_block_1, y_block_1, x_block_2, y_block_2)
-                        success, distance = GeneticAlgorithm.walk(problem, initial_node, path)
+                        initial_node = Node(x_block_1, y_block_1, x_block_2, y_block_2, -1)
+                        success, node = GeneticAlgorithm.walk(problem, initial_node, path)
                         if success:
-                            return path, resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+                            return node.solution(), resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
                         else:
                             paths.append(path)
-                            results.append(distance)
+                            results.append(node.distance_to_goal)
 
             # Mutation
             for path in paths:
                 child = GeneticAlgorithm.mutation(path, i / float(MAX_GENERATIONS))
                 if child:
-                    initial_node = Node(x_block_1, y_block_1, x_block_2, y_block_2)
-                    success, distance = GeneticAlgorithm.walk(problem, initial_node, child)
+                    initial_node = Node(x_block_1, y_block_1, x_block_2, y_block_2, -1)
+                    success, node = GeneticAlgorithm.walk(problem, initial_node, child)
                     if success:
-                        return child, resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+                        return node.solution(), resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
                     else:
                         paths.append(child)
-                        results.append(distance)
+                        results.append(node.distance_to_goal)
 
             best_idx = np.argpartition(np.array(results), POPULATION_SIZE)[:POPULATION_SIZE]
             results = [results[i] for i in best_idx]
@@ -94,65 +94,31 @@ class GeneticAlgorithm:
         # Cannot find path
         return [], resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
 
-        
-
 
 if __name__ == '__main__':
-    # sample_matrix = [
-    #     ["O", "O", "O", "X", "X", "X", "X", "X", "X", "X"],
-    #     ["O", "O", "O", "O", "O", "O", "X", "X", "X", "X"],
-    #     ["O", "O", "O", "S", "O", "O", "O", "O", "O", "X"],
-    #     ["X", "O", "O", "S", "O", "O", "O", "O", "O", "O"],
-    #     ["X", "X", "X", "X", "X", "O", "O", "G", "O", "O"],
-    #     ["X", "X", "X", "X", "X", "X", "O", "O", "O", "X"],
-    # ]
+    with open("maps.json", "r") as f:
+        sample_matrix = json.load(f)
 
-    # sample_matrix = [
-    #     ["S", "O", "O"],
-    #     ["O", "O", "O"],
-    #     ["O", "O", "G"],
-    #     ["X", "O", "O"],
-    #     ["X", "X", "X"],
-    # ]
-
-    # sample_matrix = [
-    #     ['O', 'O', 'O', 'X', 'O', 'X', 'X', 'X'],
-    #     ['O', 'O', 'O', 'O', 'O', 'O', 'G', 'X'],
-    #     ['X', 'X', 'O', 'X', 'O', 'O', 'O', 'O'],
-    #     ['S', 'S', 'O', 'X', 'X', 'X', 'O', 'O']
-    # ]
-
-    # sample_matrix = [
-    #     ['O', 'O', 'O', 'X', 'O', 'X', 'X', 'X'],
-    #     ['O', 'O', 'O', 'O', 'O', 'O', 'G', 'X'],
-    #     ['X', 'X', 'O', 'X', 'O', 'O', 'O', 'O'],
-    #     ['S', 'S', 'O', 'X', 'X', 'X', 'O', 'O']
-    # ]
-
-    sample_matrix = [
-        ['O', 'O', 'O', 'O', 'X', 'X', 'X', 'X', 'X', 'X'],
-        ['O', 'O', 'O', 'O', 'X', 'X', 'X', 'O', 'O', 'O'],
-        ['O', 'O', 'O', 'O', 'O', 'O', 'O', 'O', 'O', 'G'],
-        ['O', 'O', 'O', 'O', 'X', 'X', 'X', 'O', 'O', 'O'],
-        ['O', 'O', 'O', 'O', 'X', 'X', 'X', 'X', 'X', 'X'],
-        ['S', 'S', 'O', 'O', 'X', 'X', 'X', 'X', 'X', 'X']
-    ]
-
-    # Coordinates of the block
-    problem = Problem(sample_matrix)
-
-    # Solve the problem, calculate time and memory usage
+    # Note: Not all maps are solvable
+    problem = Problem(sample_matrix[0])
     start_time = time.time()
-    result_node, memory_info = GeneticAlgorithm.run(problem)
+    solution, memory_info = GeneticAlgorithm.run(problem)
     end_time = time.time()
 
     print("\n--- %s seconds ---" % (end_time - start_time))
     print(f"\n{memory_info} bytes\n")
 
-    if result_node is None:
+    if solution is None:
         print("Cannot find solution.")
     else:
-        # Print the whole path
-        # TODO: Print just the path to the goal
-        mapping = [ "LEFT", "DOWN", "UP", "RIGHT" ]
-        print(list(map(lambda step: mapping[step], result_node)))
+        step_map = [ "LEFT", "DOWN", "UP", "RIGHT" ]
+        print(f"Original solution:\t{list(map(lambda x: step_map[x], solution))}")
+        
+        short_solution = solution.copy()
+        i = 0
+        while i < len(short_solution[:-1]):
+            if short_solution[i] + short_solution[i + 1] == 3:
+                del short_solution[i:i+2]
+            i += 1
+
+        print(f"Redundant-free:\t\t{list(map(lambda x: step_map[x], short_solution))}")

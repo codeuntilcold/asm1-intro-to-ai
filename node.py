@@ -2,12 +2,13 @@
 
 class Node:
     # In this case, g --> path_cost  &   h --> distance_to_goal
-    def __init__(self, x1, y1, x2, y2, parent=None, path_cost=0, distance_to_goal=0):
+    def __init__(self, x1, y1, x2, y2, action, parent=None, path_cost=0, distance_to_goal=0):
         """Create a search tree Node, derived from a parent by an action."""
         self.x1 = x1
         self.y1 = y1
         self.x2 = x2
         self.y2 = y2
+        self.action = action
         self.parent = parent
         self.path_cost = path_cost
         self.distance_to_goal = distance_to_goal
